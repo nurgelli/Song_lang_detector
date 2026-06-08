@@ -1,48 +1,57 @@
-import os
 import argparse
+import os
+
+import torch
 import torchaudio
-import openunmix
+from openunmix import predict
 
-def run_unmix(input_file, output_dir):
+
+def run_unmix(input_file: str, output_dir: str) -> str | None:
     try:
-        target = "vocals"
-        model = "umxhq" 
+        target     = "vocals"
+        model_name = "umxhq"   
 
-        print(f"Song is loading: {input_file}")
-        
-      
+        print(f"[worker] Music loading: {input_file}")
         audio, rate = torchaudio.load(input_file)
-        
-        print(f"Vocal seperating starting ({model} model)...")
-        estimates = openunmix.model.separate_audio(
-            audio, 
-            rate, 
-            targets=[target], 
-            model_name=model
-        )
 
-        output_filepath = os.path.join(output_dir, f"{target}.wav")
+        if audio.shape[0] == 1:
+            audio = audio.repeat(2, 1)      
+        elif audio.shape[0] > 2:
+            audio = audio[:2, :]            
+
+        audio_batch = audio.unsqueeze(0)
+
+        print(f"[worker] vocal seperating ({model_name})...")
+        with torch.no_grad():
+            estimates = predict.separate(
+                audio=audio_batch,
+                rate=rate,
+                model_str_or_path=model_name,
+                targets=[target],
+                residual=False,
+            )
+
+        vocal_tensor = estimates[target].squeeze(0)   
 
         os.makedirs(output_dir, exist_ok=True)
-        
+        output_filepath = os.path.join(output_dir, f"{target}.wav")
 
-        vocal_track = estimates[0, ...]
-
-
-        torchaudio.save(output_filepath, vocal_track, rate)
-        
-        print(f"Vocal successfully got: {output_filepath}")
+        torchaudio.save(output_filepath, vocal_tensor, rate)
+        print(f"[worker] Vocal saved: {output_filepath}")
         return output_filepath
 
     except Exception as e:
-        print(f"Error in starting Open-Unmix: {e}")
+        print(f"[worker] error: {e}")
         return None
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("input_file", type=str, help="Audio file input")
-    parser.add_argument("output_dir", type=str, help="Output folder")
-    
+    parser = argparse.ArgumentParser(description="Open-Unmix Vocal Separator Worker")
+    parser.add_argument("input_file", type=str, help="Input music file (wav/mp3/flac...)")
+    parser.add_argument("output_dir", type=str, help="output folder (vocals.wav buraya yazılır)")
     args = parser.parse_args()
-    
-    run_unmix(args.input_file, args.output_dir)
+
+    result = run_unmix(args.input_file, args.output_dir)
+    if result is None:
+        print("[worker] Seperation failed.")
+        raise SystemExit(1)

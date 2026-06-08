@@ -1,0 +1,47 @@
+services:
+  lang-detector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        ENV_MODE: dev # dev= tiny modeld -> docker compose restart
+
+    container_name: lang_detector
+    image: lang-detector:local
+
+    ports:
+      - '8000:8000' # http://localhost:8000/docs  ← Swagger UI
+
+    env_file:
+      - .env.dev
+
+    volumes:
+      # Whisper model files caching
+      - whisper_cache:/root/.cache/whisper
+
+      # Open-Unmix model files caching
+      - openunmix_cache:/root/.cache/torch/hub
+
+    restart: unless-stopped
+
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import urllib.request; urllib.request.urlopen(''http://localhost:8000/health'')"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+    # CPU limiti (opsiyonel — gerekirse yorum satırını kaldır)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '4'
+    #       memory: 4G
+
+volumes:
+  whisper_cache:
+  openunmix_cache:
