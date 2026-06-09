@@ -23,13 +23,15 @@ app = FastAPI(
         "**How to use:** send song to the `POST /detect` endpoint, "
         "get detected language + lyrics as JSON."
     ),
-    version="3.0.0",
+    version="3.1.0",
 )
 
-# Serve frontend
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 SUPPORTED_FORMATS = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".mp4", ".webm"}
+
+
+_vocal_store: dict[str, str] = {}
 
 
 @app.get("/", include_in_schema=False)
@@ -43,6 +45,20 @@ def health_check():
         "status": "ok",
         "unmix_enabled": ENABLE_UNMIX,
     }
+
+
+@app.get("/vocal/{job_id}", tags=["Detection"])
+def download_vocal(job_id: str):
+    """Unmix sonrası ayrıştırılan vocal dosyasını indir."""
+    path = _vocal_store.get(job_id)
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Vocal not found or already cleaned up.")
+    return FileResponse(
+        path,
+        media_type="audio/wav",
+        filename="vocals.wav",
+        headers={"Content-Disposition": "attachment; filename=vocals.wav"},
+    )
 
 
 def unmix_audio_to_vocal(input_filepath: str, output_dir: str) -> str | None:
@@ -104,12 +120,16 @@ async def detect_language(
 
         audio_path    = input_path
         unmix_applied = False
+        vocal_url     = None
 
         if enable_unmix:
             vocal_path = unmix_audio_to_vocal(input_path, job_dir)
             if vocal_path:
                 audio_path    = vocal_path
                 unmix_applied = True
+                # Vocal'i store'a kaydet, download endpoint'i için
+                _vocal_store[job_id] = vocal_path
+                vocal_url = f"/vocal/{job_id}"
             else:
                 print("[detect] Unmix failed, using original audio.")
 
@@ -120,6 +140,7 @@ async def detect_language(
             "detected_language": result["language"],
             "transcription":     result["transcription"],
             "unmix_applied":     unmix_applied,
+            "vocal_url":         vocal_url,   # None veya "/vocal/{job_id}"
             "job_id":            job_id,
         })
 
@@ -127,8 +148,29 @@ async def detect_language(
         raise HTTPException(status_code=500, detail=str(e))
 
     finally:
-        if os.path.exists(job_dir):
-            shutil.rmtree(job_dir, ignore_errors=True)
+        # Vocal store'daki job için job_dir'i HEMEN silmiyoruz,
+        # sadece input dosyasını ve vocal olmayan dosyaları temizle
+        if unmix_applied if 'unmix_applied' in dir() else False:
+            # Vocal dosyası hâlâ gerekli, sadece input'u sil
+            if os.path.exists(input_path):
+                try:
+                    os.unlink(input_path)
+                except Exception:
+                    pass
+        else:
+            # Unmix yok veya başarısız — klasörün tamamını temizle
+            if os.path.exists(job_dir):
+                shutil.rmtree(job_dir, ignore_errors=True)
+
+
+@app.delete("/vocal/{job_id}", include_in_schema=False)
+def cleanup_vocal(job_id: str):
+    """Frontend indirme sonrası temizlik için çağırır."""
+    path = _vocal_store.pop(job_id, None)
+    job_dir = os.path.join(TEMP_DIR, job_id)
+    if os.path.exists(job_dir):
+        shutil.rmtree(job_dir, ignore_errors=True)
+    return {"cleaned": True}
 
 
 if __name__ == "__main__":

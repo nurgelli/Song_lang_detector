@@ -8,10 +8,12 @@ A production-ready REST microservice that accepts an audio file, optionally sepa
 
 <!-- SCREENSHOT 1: Place a screenshot of the Swagger UI at docs/swagger_ui.png -->
 <!-- Recommended: open http://localhost:8000/docs after running, take a full-page screenshot -->
+
 ![Swagger UI](docs/swagger_ui.png)
 
 <!-- SCREENSHOT 2: Place a screenshot of a /detect API response (JSON) at docs/detect_response.png -->
 <!-- Recommended: use the Swagger UI "Try it out" button, upload an audio file, capture the response panel -->
+
 ![Detect Response](docs/detect_response.png)
 
 ---
@@ -52,24 +54,24 @@ FastAPI  (main.py)
 
 Two separate Python environments share the same container:
 
-| Environment | Runtime | Key Packages |
-|---|---|---|
-| System Python | `python main.py` | FastAPI, Whisper, torch 2.8.0 |
+| Environment    | Runtime           | Key Packages                        |
+| -------------- | ----------------- | ----------------------------------- |
+| System Python  | `python main.py`  | FastAPI, Whisper, torch 2.8.0       |
 | `/worker_venv` | `subprocess` call | Open-Unmix, torchaudio, torch 2.3.1 |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| API Framework | FastAPI 0.116 + Uvicorn |
-| Language Detection | OpenAI Whisper (`openai-whisper`) |
-| Vocal Separation | Open-Unmix (`openunmix`) |
-| Deep Learning | PyTorch 2.8 (main) / PyTorch 2.3 (worker) |
-| Containerization | Docker — multi-stage build |
-| Orchestration | Docker Compose |
-| Config Management | `python-dotenv`, environment variables |
+| Layer              | Technology                                |
+| ------------------ | ----------------------------------------- |
+| API Framework      | FastAPI 0.116 + Uvicorn                   |
+| Language Detection | OpenAI Whisper (`openai-whisper`)         |
+| Vocal Separation   | Open-Unmix (`openunmix`)                  |
+| Deep Learning      | PyTorch 2.8 (main) / PyTorch 2.3 (worker) |
+| Containerization   | Docker — multi-stage build                |
+| Orchestration      | Docker Compose                            |
+| Config Management  | `python-dotenv`, environment variables    |
 
 ---
 
@@ -98,12 +100,14 @@ Interactive docs (Swagger UI) at **http://localhost:8000/docs**
 Detect the language of an audio file.
 
 **Request**
+
 ```
 Content-Type: multipart/form-data
 Body: file=<audio_file>
 ```
 
 **Response**
+
 ```json
 {
   "filename": "song.mp3",
@@ -116,25 +120,26 @@ Body: file=<audio_file>
 **Supported formats:** `.mp3` `.wav` `.flac` `.m4a` `.ogg` `.aac` `.wma` `.mp4` `.webm`
 
 **cURL example**
+
 ```bash
 curl -X POST http://localhost:8000/detect \
   -F "file=@/path/to/song.mp3"
 ```
 
 ### `GET /health`
-```json
-{"status": "ok", "unmix_applied": false}
-```
----
 
+```json
+{ "status": "ok", "unmix_applied": false }
+```
+
+---
 
 > http:localhost:8000
 
-![Project Structure](asset/ui.png)
-
+![Web app Ui](asset/ui.png)
 
 > Result
-![Project Structure](asset/result.png)
+> ![Result](asset/result.png)
 
 ---
 
@@ -142,13 +147,13 @@ curl -X POST http://localhost:8000/detect \
 
 All configuration is managed via `.env.dev`:
 
-| Variable | Default | Description |
-|---|---|---|
-| `ENV_MODE` | `dev` | `dev` → tiny Whisper model; `prod` → turbo model |
-| `ENABLE_UNMIX` | `false` | Enable vocal separation before language detection |
-| `PYTHON_SP_VENV_PATH` | `/worker_venv/bin/python` | Path to the Open-Unmix venv Python binary |
-| `UNMIX_WORKER_SCRIPT` | `/app/unmix_worker.py` | Path to the vocal separation worker |
-| `TEMP_DIR` | `/tmp/song_processing` | Working directory for temporary files |
+| Variable              | Default                   | Description                                       |
+| --------------------- | ------------------------- | ------------------------------------------------- |
+| `ENV_MODE`            | `dev`                     | `dev` → tiny Whisper model; `prod` → turbo model  |
+| `ENABLE_UNMIX`        | `false`                   | Enable vocal separation before language detection |
+| `PYTHON_SP_VENV_PATH` | `/worker_venv/bin/python` | Path to the Open-Unmix venv Python binary         |
+| `UNMIX_WORKER_SCRIPT` | `/app/unmix_worker.py`    | Path to the vocal separation worker               |
+| `TEMP_DIR`            | `/tmp/song_processing`    | Working directory for temporary files             |
 
 **Enable vocal separation at runtime (no rebuild needed):**
 
@@ -190,8 +195,9 @@ Native async support, automatic OpenAPI/Swagger generation, and built-in multipa
 
 ---
 
-> NOTE: BECAUSE OF TINY (MIN WHISPER MODEL) THERE IS PROBLEM WITH ACCURACY IN DETECTION LANGUAGE, THAT WHEY RECOMMENDED TO APPLY UNMIX TO SEPERATE VOCAL!
+> NOTE: BECAUSE OF TINY (MIN WHISPER MODEL) THERE IS PROBLEM WITH ACCURACY IN DETECTION LANGUAGE, THAT'S WHY RECOMMENDED TO APPLY UNMIX TO SEPERATE VOCAL, AND USE TURBO MODEL TO GET 100% ACCURACY
 
+![Unmix_result](asset/unmix_result.png)
 
 ---
 

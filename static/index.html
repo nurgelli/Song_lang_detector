@@ -521,6 +521,72 @@
         color: var(--text-3);
       }
 
+      /* Vocal download card */
+      .vocal-card {
+        background: var(--surface);
+        border: 1px solid rgba(52, 211, 153, 0.2);
+        border-radius: var(--radius);
+        padding: 18px 22px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        animation: slideUp 0.3s ease both;
+      }
+
+      .vocal-icon {
+        width: 40px;
+        height: 40px;
+        background: var(--green-dim);
+        border: 1px solid rgba(52, 211, 153, 0.2);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .vocal-meta {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .vocal-title {
+        font-family: var(--font-d);
+        font-size: 13.5px;
+        font-weight: 600;
+        color: var(--green);
+      }
+
+      .vocal-hint {
+        font-size: 11.5px;
+        color: var(--text-2);
+        margin-top: 2px;
+      }
+
+      .download-btn {
+        background: var(--green-dim);
+        border: 1px solid rgba(52, 211, 153, 0.25);
+        color: var(--green);
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-family: var(--font-d);
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        text-decoration: none;
+        transition: background 0.15s, box-shadow 0.15s;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      .download-btn:hover {
+        background: rgba(52, 211, 153, 0.2);
+        box-shadow: 0 4px 14px rgba(52, 211, 153, 0.15);
+      }
+
       /* Error */
       .error-card {
         background: var(--red-dim);
@@ -865,6 +931,7 @@
         const lyrics = (d.transcription || '').trim();
         const unmix = d.unmix_applied;
         const job = d.job_id || '';
+        const vocalUrl = d.vocal_url || null;
 
         let html = `
         <div class="r-card" style="animation-delay:0s">
@@ -882,13 +949,44 @@
               ? `<div class="lyrics-text">${esc(lyrics)}</div>`
               : `<div class="no-lyrics">Word not detected or instrumental.</div>`
           }
-        </div>
+        </div>`;
 
-        <div class="r-card" style="animation-delay:0.16s">
+        // Vocal download kartı — sadece unmix başarılıysa göster
+        if (unmix && vocalUrl) {
+          html += `
+        <div class="vocal-card" style="animation-delay:0.16s">
+          <div class="vocal-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                 stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+              <line x1="12" y1="19" x2="12" y2="23"/>
+              <line x1="8" y1="23" x2="16" y2="23"/>
+            </svg>
+          </div>
+          <div class="vocal-meta">
+            <div class="vocal-title">Vocal Track Ready</div>
+            <div class="vocal-hint">Isolated vocals · WAV · 44.1 kHz stereo</div>
+          </div>
+          <a class="download-btn" href="${esc(vocalUrl)}" download="vocals.wav"
+             onclick="scheduleCleanup('${esc(job)}')">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Download
+          </a>
+        </div>`;
+        }
+
+        html += `
+        <div class="r-card" style="animation-delay:${unmix && vocalUrl ? '0.24' : '0.16'}s">
           <div class="meta-row">
             <div class="meta-item">
               <div class="dot ${unmix ? 'dot-green' : 'dot-gray'}"></div>
-              <span>Unmix: ${unmix ? 'Applied' : 'not Aplied'}</span>
+              <span>Unmix: ${unmix ? 'Applied' : 'Not Applied'}</span>
             </div>
             <div class="meta-item">
               <div class="dot dot-gray"></div>
@@ -902,6 +1000,13 @@
           behavior: 'smooth',
           block: 'nearest',
         });
+      }
+
+      function scheduleCleanup(jobId) {
+        // İndirme başladıktan 30sn sonra sunucudaki temp dosyayı temizle
+        setTimeout(() => {
+          fetch(`/vocal/${jobId}`, { method: 'DELETE' }).catch(() => {});
+        }, 30000);
       }
 
       function showError(msg) {

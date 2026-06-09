@@ -12,3 +12,5 @@ sp_venv
 .env
 wheels/
 
+temp/
+
