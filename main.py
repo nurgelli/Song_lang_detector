@@ -4,10 +4,11 @@ import subprocess
 import uuid
 
 import uvicorn
-from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
-from app.lang_detect import detect_lang
+from app.lang_detect import analyze_audio
 from app.settings import (
     ENABLE_UNMIX,
     PYTHON_SP_VENV_PATH,
@@ -16,16 +17,25 @@ from app.settings import (
 )
 
 app = FastAPI(
-    title="🎵 Audio Language Detector",
+    title="Audio Language Detector",
     description=(
-        "Upload Song => detect language.\n\n"
-        "**How to use:** send song to the  `POST /detect` endpoint, "
-        "Get detected lang as a JSON."
+        "Upload Song => detect language & transcribe lyrics.\n\n"
+        "**How to use:** send song to the `POST /detect` endpoint, "
+        "get detected language + lyrics as JSON."
     ),
-    version="2.0.0",
+    version="3.0.0",
 )
 
+# Serve frontend
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 SUPPORTED_FORMATS = {".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac", ".wma", ".mp4", ".webm"}
+
+
+@app.get("/", include_in_schema=False)
+def index():
+    return FileResponse("static/index.html")
+
 
 @app.get("/health", tags=["System"])
 def health_check():
@@ -34,8 +44,8 @@ def health_check():
         "unmix_enabled": ENABLE_UNMIX,
     }
 
+
 def unmix_audio_to_vocal(input_filepath: str, output_dir: str) -> str | None:
-  
     command = [
         PYTHON_SP_VENV_PATH,
         UNMIX_WORKER_SCRIPT,
@@ -65,20 +75,20 @@ def unmix_audio_to_vocal(input_filepath: str, output_dir: str) -> str | None:
         return None
 
 
-
 @app.post("/detect", tags=["Detection"])
-async def detect_language(file: UploadFile = File(..., description="Target file")):
-   
+async def detect_language(
+    file: UploadFile = File(..., description="Target audio file"),
+    enable_unmix: bool = Form(default=False, description="Apply vocal isolation before analysis"),
+):
     filename = file.filename or "upload"
     ext = os.path.splitext(filename)[1].lower()
 
     if ext not in SUPPORTED_FORMATS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported format: '{ext}'. Supported ones: {', '.join(sorted(SUPPORTED_FORMATS))}",
+            detail=f"Unsupported format: '{ext}'. Supported: {', '.join(sorted(SUPPORTED_FORMATS))}",
         )
 
- 
     job_id  = str(uuid.uuid4())
     job_dir = os.path.join(TEMP_DIR, job_id)
     os.makedirs(job_dir, exist_ok=True)
@@ -86,31 +96,29 @@ async def detect_language(file: UploadFile = File(..., description="Target file"
     input_path = os.path.join(job_dir, f"input{ext}")
 
     try:
-        
         with open(input_path, "wb") as f:
             content = await file.read()
             f.write(content)
 
-        print(f"[detect] New request => job_id={job_id}, dosya={filename} ({len(content):,} byte)")
+        print(f"[detect] New request => job_id={job_id}, file={filename} ({len(content):,} bytes), unmix={enable_unmix}")
 
         audio_path    = input_path
         unmix_applied = False
 
-        
-        if ENABLE_UNMIX:
+        if enable_unmix:
             vocal_path = unmix_audio_to_vocal(input_path, job_dir)
             if vocal_path:
                 audio_path    = vocal_path
                 unmix_applied = True
             else:
-                print("[detect] Unmix failed, original voice using.")
+                print("[detect] Unmix failed, using original audio.")
 
-        
-        detected_lang = detect_lang(audio_path)
+        result = analyze_audio(audio_path)
 
         return JSONResponse(content={
             "filename":          filename,
-            "detected_language": detected_lang,
+            "detected_language": result["language"],
+            "transcription":     result["transcription"],
             "unmix_applied":     unmix_applied,
             "job_id":            job_id,
         })
@@ -123,8 +131,6 @@ async def detect_language(file: UploadFile = File(..., description="Target file"
             shutil.rmtree(job_dir, ignore_errors=True)
 
 
-# ─── Entry Point ──────────────────────────────────────────────────────────────
-
 if __name__ == "__main__":
     os.makedirs(TEMP_DIR, exist_ok=True)
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, log_level="info")
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False, log_level="info")

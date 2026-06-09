@@ -1,0 +1,916 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+    <title>Aural · Ses Analiz</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #08080a;
+        --surface: #101013;
+        --surface-2: #18181d;
+        --border: #1e1e26;
+        --border-2: #2a2a34;
+        --accent: #8b5cf6;
+        --accent-dim: #7c3aed;
+        --accent-glow: rgba(139, 92, 246, 0.18);
+        --accent-text: #a78bfa;
+        --text-1: #edecf5;
+        --text-2: #8888a2;
+        --text-3: #44444e;
+        --green: #34d399;
+        --green-dim: rgba(52, 211, 153, 0.12);
+        --red: #f87171;
+        --red-dim: rgba(248, 113, 113, 0.1);
+        --radius: 14px;
+        --font-d: 'Space Grotesk', sans-serif;
+        --font-b: 'Inter', sans-serif;
+        --font-m: 'JetBrains Mono', monospace;
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text-1);
+        font-family: var(--font-b);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 52px 16px 80px;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* ─── Header ─────────────────────────── */
+      .header {
+        text-align: center;
+        margin-bottom: 36px;
+      }
+
+      .logo-row {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 6px;
+      }
+
+      .logo-icon {
+        width: 38px;
+        height: 38px;
+        background: linear-gradient(135deg, #7c3aed, #a78bfa);
+        border-radius: 11px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+      }
+
+      .logo-title {
+        font-family: var(--font-d);
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.6px;
+      }
+
+      .header-sub {
+        font-size: 13.5px;
+        color: var(--text-2);
+        letter-spacing: 0.01em;
+      }
+
+      /* ─── Upload Card ──────────────────────── */
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        width: 100%;
+        max-width: 560px;
+      }
+
+      /* Drop zone */
+      .drop-zone {
+        position: relative;
+        padding: 44px 24px 36px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.2s;
+        overflow: hidden;
+      }
+
+      .drop-zone::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(
+          ellipse 60% 40% at 50% 0%,
+          rgba(139, 92, 246, 0.06) 0%,
+          transparent 70%
+        );
+        pointer-events: none;
+      }
+
+      .drop-zone:hover,
+      .drop-zone.drag-over {
+        background: rgba(139, 92, 246, 0.04);
+      }
+
+      .drop-zone.drag-over {
+        border-color: var(--accent);
+      }
+
+      .drop-zone input[type='file'] {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        cursor: pointer;
+        z-index: 1;
+      }
+
+      /* ─── Waveform ─────────────────────────── */
+      .waveform {
+        display: flex;
+        align-items: center;
+        gap: 3px;
+        height: 52px;
+        transform-origin: center;
+      }
+
+      .bar {
+        width: 3px;
+        border-radius: 3px;
+        background: var(--accent);
+        transform-origin: bottom center;
+        animation: wave 1.4s ease-in-out infinite;
+      }
+
+      .waveform.paused .bar {
+        animation-play-state: paused;
+      }
+
+      @keyframes wave {
+        0%,
+        100% {
+          transform: scaleY(0.18);
+          opacity: 0.22;
+        }
+        50% {
+          transform: scaleY(1);
+          opacity: 0.75;
+        }
+      }
+
+      .waveform.analyzing .bar {
+        animation-duration: 0.45s !important;
+        opacity: 0.9 !important;
+      }
+
+      .drop-copy {
+        text-align: center;
+      }
+
+      .drop-primary {
+        font-family: var(--font-d);
+        font-size: 14.5px;
+        font-weight: 500;
+        color: var(--text-2);
+      }
+
+      .drop-primary strong {
+        color: var(--accent-text);
+        font-weight: 600;
+      }
+
+      .drop-formats {
+        margin-top: 4px;
+        font-size: 11.5px;
+        color: var(--text-3);
+        letter-spacing: 0.02em;
+      }
+
+      /* ─── File Selected ──────────────────── */
+      .file-info {
+        display: none;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-2);
+      }
+
+      .file-thumb {
+        width: 38px;
+        height: 38px;
+        background: var(--accent-glow);
+        border: 1px solid rgba(139, 92, 246, 0.2);
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .file-meta {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .file-name {
+        font-family: var(--font-d);
+        font-size: 13.5px;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .file-size {
+        font-size: 12px;
+        color: var(--text-2);
+        margin-top: 2px;
+      }
+
+      .clear-btn {
+        background: var(--surface);
+        border: 1px solid var(--border-2);
+        color: var(--text-2);
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.15s;
+        flex-shrink: 0;
+      }
+
+      .clear-btn:hover {
+        background: var(--red-dim);
+        border-color: rgba(248, 113, 113, 0.25);
+        color: var(--red);
+      }
+
+      /* ─── Options Row ──────────────────── */
+      .options-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .option-text {
+      }
+
+      .option-label {
+        font-size: 13.5px;
+        font-weight: 500;
+      }
+
+      .option-hint {
+        font-size: 11.5px;
+        color: var(--text-2);
+        margin-top: 2px;
+      }
+
+      /* Toggle */
+      .toggle {
+        position: relative;
+        width: 44px;
+        height: 24px;
+        flex-shrink: 0;
+      }
+      .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+
+      .track {
+        position: absolute;
+        inset: 0;
+        background: var(--surface-2);
+        border: 1px solid var(--border-2);
+        border-radius: 12px;
+        cursor: pointer;
+        transition:
+          background 0.2s,
+          border-color 0.2s;
+      }
+
+      .track::after {
+        content: '';
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 16px;
+        height: 16px;
+        background: var(--text-3);
+        border-radius: 50%;
+        transition:
+          transform 0.2s,
+          background 0.2s;
+      }
+
+      .toggle input:checked + .track {
+        background: var(--accent);
+        border-color: var(--accent-dim);
+      }
+
+      .toggle input:checked + .track::after {
+        transform: translateX(20px);
+        background: #fff;
+      }
+
+      /* ─── Analyze Button ─────────────────── */
+      .card-footer {
+        padding: 18px 20px;
+      }
+
+      .analyze-btn {
+        width: 100%;
+        padding: 13px 20px;
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        border-radius: 10px;
+        font-family: var(--font-d);
+        font-size: 14.5px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        cursor: pointer;
+        transition:
+          background 0.15s,
+          box-shadow 0.15s,
+          transform 0.1s,
+          opacity 0.15s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .analyze-btn:hover:not(:disabled) {
+        background: var(--accent-dim);
+        box-shadow: 0 6px 20px rgba(139, 92, 246, 0.3);
+        transform: translateY(-1px);
+      }
+
+      .analyze-btn:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      .analyze-btn:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
+      .spinner {
+        display: none;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.55s linear infinite;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ─── Results ───────────────────────── */
+      .results-wrap {
+        margin-top: 14px;
+        width: 100%;
+        max-width: 560px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .r-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 22px;
+        animation: slideUp 0.3s ease both;
+      }
+
+      @keyframes slideUp {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .r-label {
+        font-size: 10.5px;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-3);
+        margin-bottom: 12px;
+      }
+
+      /* Language result */
+      .lang-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .lang-code {
+        font-family: var(--font-m);
+        font-size: 12px;
+        font-weight: 500;
+        padding: 4px 9px;
+        background: var(--accent-glow);
+        border: 1px solid rgba(139, 92, 246, 0.25);
+        border-radius: 6px;
+        color: var(--accent-text);
+        letter-spacing: 0.03em;
+      }
+
+      .lang-name {
+        font-family: var(--font-d);
+        font-size: 24px;
+        font-weight: 700;
+        letter-spacing: -0.4px;
+      }
+
+      /* Transcription */
+      .lyrics-text {
+        font-family: var(--font-m);
+        font-size: 13px;
+        line-height: 1.75;
+        color: var(--text-2);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .no-lyrics {
+        font-size: 13px;
+        color: var(--text-3);
+        font-style: italic;
+      }
+
+      /* Meta card */
+      .meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+      }
+
+      .meta-item {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: var(--text-2);
+      }
+
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+
+      .dot-green {
+        background: var(--green);
+        box-shadow: 0 0 6px var(--green);
+      }
+      .dot-gray {
+        background: var(--text-3);
+      }
+
+      .meta-id {
+        font-family: var(--font-m);
+        font-size: 11px;
+        color: var(--text-3);
+      }
+
+      /* Error */
+      .error-card {
+        background: var(--red-dim);
+        border: 1px solid rgba(248, 113, 113, 0.2);
+        border-radius: var(--radius);
+        padding: 20px 22px;
+        animation: slideUp 0.3s ease both;
+      }
+
+      .error-title {
+        font-family: var(--font-d);
+        font-weight: 600;
+        font-size: 14px;
+        color: var(--red);
+        margin-bottom: 5px;
+      }
+
+      .error-body {
+        font-size: 13px;
+        color: rgba(248, 113, 113, 0.8);
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Header -->
+    <header class="header">
+      <div class="logo-row">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <rect
+              x="2"
+              y="8"
+              width="2.5"
+              height="4"
+              rx="1.25"
+              fill="white"
+              opacity="0.6"
+            />
+            <rect
+              x="6"
+              y="5"
+              width="2.5"
+              height="10"
+              rx="1.25"
+              fill="white"
+              opacity="0.8"
+            />
+            <rect
+              x="10"
+              y="3"
+              width="2.5"
+              height="14"
+              rx="1.25"
+              fill="white"
+            />
+            <rect
+              x="14"
+              y="6"
+              width="2.5"
+              height="8"
+              rx="1.25"
+              fill="white"
+              opacity="0.7"
+            />
+          </svg>
+        </div>
+        <span class="logo-title">Lang Detect</span>
+      </div>
+      <p class="header-sub">Lang detection from song</p>
+    </header>
+
+    <!-- Upload Card -->
+    <div class="card">
+      <!-- Drop Zone -->
+      <div class="drop-zone" id="dropZone">
+        <input
+          type="file"
+          id="fileInput"
+          accept=".mp3,.wav,.flac,.m4a,.ogg,.aac,.wma,.mp4,.webm"
+        />
+        <div class="waveform" id="waveform"></div>
+        <div class="drop-copy">
+          <p class="drop-primary">
+            <strong>Select audio file</strong> or drage here
+          </p>
+          <p class="drop-formats">
+            MP3 · WAV · FLAC · M4A · OGG · AAC · WMA
+          </p>
+        </div>
+      </div>
+
+      <!-- File info (after selection) -->
+      <div class="file-info" id="fileInfo">
+        <div class="file-thumb">
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#A78BFA"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M9 18V5l12-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+          </svg>
+        </div>
+        <div class="file-meta">
+          <div class="file-name" id="fileName"></div>
+          <div class="file-size" id="fileSize"></div>
+        </div>
+        <button
+          class="clear-btn"
+          id="clearBtn"
+          title="Kaldır"
+          type="button"
+        >
+          <svg
+            width="13"
+            height="13"
+            viewBox="0 0 13 13"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          >
+            <line x1="1" y1="1" x2="12" y2="12" />
+            <line x1="12" y1="1" x2="1" y2="12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Options -->
+      <div class="options-row">
+        <div class="option-text">
+          <div class="option-label">Vocal seperation</div>
+          <div class="option-hint">
+            Unmix — just analyze vocal by seperating music. To be more
+            accurate
+          </div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="unmixToggle" />
+          <span class="track"></span>
+        </label>
+      </div>
+
+      <!-- Footer / Button -->
+      <div class="card-footer">
+        <button
+          class="analyze-btn"
+          id="analyzeBtn"
+          disabled
+          type="button"
+        >
+          <div class="spinner" id="spinner"></div>
+          <span id="btnLabel">Let's Analyze</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-wrap" id="resultsWrap"></div>
+
+    <script>
+      /* ── Waveform generation ─────────────────────────────── */
+      const waveform = document.getElementById('waveform');
+      const HEIGHTS = [
+        14, 22, 34, 44, 50, 46, 52, 42, 52, 46, 38, 50, 52, 46, 42,
+        50, 52, 46, 38, 50, 52, 44, 38, 26, 42, 52, 34, 18,
+      ];
+      HEIGHTS.forEach((h, i) => {
+        const bar = document.createElement('div');
+        bar.className = 'bar';
+        bar.style.cssText = `
+        height: ${h}px;
+        animation-delay: ${(i * 0.06).toFixed(2)}s;
+        animation-duration: ${(0.85 + (i % 7) * 0.12).toFixed(2)}s;
+      `;
+        waveform.appendChild(bar);
+      });
+
+      /* ── State & Elements ────────────────────────────────── */
+      let selectedFile = null;
+
+      const dropZone = document.getElementById('dropZone');
+      const fileInput = document.getElementById('fileInput');
+      const fileInfo = document.getElementById('fileInfo');
+      const fileName = document.getElementById('fileName');
+      const fileSize = document.getElementById('fileSize');
+      const clearBtn = document.getElementById('clearBtn');
+      const analyzeBtn = document.getElementById('analyzeBtn');
+      const spinner = document.getElementById('spinner');
+      const btnLabel = document.getElementById('btnLabel');
+      const unmixToggle = document.getElementById('unmixToggle');
+      const resultsWrap = document.getElementById('resultsWrap');
+
+      /* ── Helpers ─────────────────────────────────────────── */
+      function fmtSize(bytes) {
+        if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+        return (bytes / 1048576).toFixed(2) + ' MB';
+      }
+
+      function setFile(file) {
+        selectedFile = file;
+        fileName.textContent = file.name;
+        fileSize.textContent = fmtSize(file.size);
+        fileInfo.style.display = 'flex';
+        analyzeBtn.disabled = false;
+      }
+
+      function clearFile() {
+        selectedFile = null;
+        fileInput.value = '';
+        fileInfo.style.display = 'none';
+        analyzeBtn.disabled = true;
+        resultsWrap.innerHTML = '';
+        waveform.classList.remove('analyzing');
+      }
+
+      function setLoading(on) {
+        analyzeBtn.disabled = on;
+        spinner.style.display = on ? 'block' : 'none';
+        btnLabel.textContent = on ? 'Analyzing…' : 'Analiz Et';
+        waveform.classList.toggle('analyzing', on);
+      }
+
+      function esc(s) {
+        return String(s)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
+      }
+
+      /* ── Language name map ──────────────────────────────── */
+      const LANGS = {
+        tr: 'Turkis',
+        en: 'English',
+        de: 'German',
+        fr: 'French',
+        es: 'Spain',
+        ar: 'Arabic',
+        ru: 'Russian',
+        ja: 'Japan',
+        ko: 'Korean',
+        zh: 'Chineese',
+        it: 'Italian',
+        pt: 'Porteguese',
+        fa: 'Persian',
+        hi: 'Indian',
+        ku: 'Kurdian',
+        az: 'Azeri',
+        ur: 'Urdu',
+        nl: 'Dutch',
+        pl: 'Polish',
+        sv: 'Sweden',
+        no: 'Norwegian',
+        da: 'Danian',
+        fi: 'Fin',
+        he: 'Hebrew',
+        th: 'Tai',
+        vi: 'Vietnameese',
+        id: 'Bahasa',
+        ms: 'Malasian',
+        uk: 'Ukrainian',
+        cs: 'Check',
+        ro: 'Romanian',
+        hu: 'Hungarian',
+        el: 'Greek',
+        bg: 'Bulgarian',
+        hr: 'Chrotian',
+        sk: 'Slovakian',
+        unknown: 'Uknown',
+      };
+
+      /* ── File input ─────────────────────────────────────── */
+      fileInput.addEventListener('change', (e) => {
+        const f = e.target.files?.[0];
+        if (f) setFile(f);
+      });
+
+      clearBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        clearFile();
+      });
+
+      /* ── Drag & drop ────────────────────────────────────── */
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+      });
+      dropZone.addEventListener('dragleave', () =>
+        dropZone.classList.remove('drag-over'),
+      );
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const f = e.dataTransfer.files?.[0];
+        if (f) setFile(f);
+      });
+
+      /* ── Analyze ────────────────────────────────────────── */
+      analyzeBtn.addEventListener('click', async () => {
+        if (!selectedFile) return;
+
+        setLoading(true);
+        resultsWrap.innerHTML = '';
+
+        const form = new FormData();
+        form.append('file', selectedFile);
+        form.append(
+          'enable_unmix',
+          unmixToggle.checked ? 'true' : 'false',
+        );
+
+        try {
+          const res = await fetch('/detect', {
+            method: 'POST',
+            body: form,
+          });
+          const data = await res.json();
+
+          if (!res.ok) {
+            showError(data.detail || 'Server Error');
+          } else {
+            showResults(data);
+          }
+        } catch {
+          showError('Not connected to server.');
+        } finally {
+          setLoading(false);
+        }
+      });
+
+      /* ── Render results ─────────────────────────────────── */
+      function showResults(d) {
+        const code = d.detected_language || 'unknown';
+        const name = LANGS[code] || code.toUpperCase();
+        const lyrics = (d.transcription || '').trim();
+        const unmix = d.unmix_applied;
+        const job = d.job_id || '';
+
+        let html = `
+        <div class="r-card" style="animation-delay:0s">
+          <div class="r-label">Tespit Edilen Dil</div>
+          <div class="lang-row">
+            <span class="lang-code">${esc(code)}</span>
+            <span class="lang-name">${esc(name)}</span>
+          </div>
+        </div>
+
+        <div class="r-card" style="animation-delay:0.08s">
+          <div class="r-label">Sözler</div>
+          ${
+            lyrics
+              ? `<div class="lyrics-text">${esc(lyrics)}</div>`
+              : `<div class="no-lyrics">Word not detected or instrumental.</div>`
+          }
+        </div>
+
+        <div class="r-card" style="animation-delay:0.16s">
+          <div class="meta-row">
+            <div class="meta-item">
+              <div class="dot ${unmix ? 'dot-green' : 'dot-gray'}"></div>
+              <span>Unmix: ${unmix ? 'Applied' : 'not Aplied'}</span>
+            </div>
+            <div class="meta-item">
+              <div class="dot dot-gray"></div>
+              <span class="meta-id">${esc(job)}</span>
+            </div>
+          </div>
+        </div>`;
+
+        resultsWrap.innerHTML = html;
+        resultsWrap.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+        });
+      }
+
+      function showError(msg) {
+        resultsWrap.innerHTML = `
+        <div class="error-card">
+          <div class="error-title">Error</div>
+          <div class="error-body">${esc(msg)}</div>
+        </div>`;
+      }
+    </script>
+  </body>
+</html>

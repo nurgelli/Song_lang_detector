@@ -1,6 +1,8 @@
 import whisper
+import warnings
 import os
 
+warnings.filterwarnings("ignore", message="FP16 is not supported on CPU")
 
 def get_whisper_model():
     env_mode   = os.getenv("ENV_MODE", "dev")
@@ -12,19 +14,22 @@ def get_whisper_model():
 model = get_whisper_model()
 
 
-def detect_lang(audio_path: str) -> str:
+def analyze_audio(audio_path: str) -> dict:
     try:
-        audio = whisper.load_audio(audio_path)
-        audio = whisper.pad_or_trim(audio)
-        mel   = whisper.log_mel_spectrogram(audio, n_mels=model.dims.n_mels).to(model.device)
+        print(f"[whisper] Analyzing: {audio_path}")
+        result = model.transcribe(audio_path)
 
-        _, probs       = model.detect_language(mel)
-        detected_lang  = max(probs, key=probs.get)
-        confidence     = round(probs[detected_lang] * 100, 1)
+        lang        = result.get("language", "unknown")
+        transcription = result.get("text", "").strip()
+        confidence  = round(result.get("language_probability", 0) * 100, 1)
 
-        print(f"[whisper] Detected Lang: {detected_lang} ({confidence}% confident)")
-        return detected_lang
+        print(f"[whisper] Lang: {lang} ({confidence}%) | {len(transcription)} chars transcribed")
+        return {"language": lang, "transcription": transcription}
 
     except Exception as e:
-        print(f"[whisper] Lang detection error: {e}")
-        return "unknown"
+        print(f"[whisper] Analysis error: {e}")
+        return {"language": "unknown", "transcription": ""}
+
+
+def detect_lang(audio_path: str) -> str:
+    return analyze_audio(audio_path)["language"]

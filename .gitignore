@@ -6,7 +6,9 @@ __pycache__/
 
 .env.dev
 .env.prod
-# *.env*
+sp_venv
 
 
 .env
+wheels/
+

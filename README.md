@@ -47,7 +47,7 @@ FastAPI  (main.py)
   │
   └── Whisper detect_lang(audio_path)
           │
-          └── {"detected_language": "tr", "unmix_applied": true, ...}
+          └── {"detected_language": "ru", "unmix_applied": true, ...}
 ```
 
 Two separate Python environments share the same container:
@@ -125,6 +125,16 @@ curl -X POST http://localhost:8000/detect \
 ```json
 {"status": "ok", "unmix_applied": false}
 ```
+---
+
+
+> http:localhost:8000
+
+![Project Structure](asset/ui.png)
+
+
+> Result
+![Project Structure](asset/result.png)
 
 ---
 
@@ -153,7 +163,7 @@ docker compose restart
 
 ## Project Structure
 
-![Project Structure](assets/image.png)
+![Project Structure](asset/structure.png)
 
 ---
 
@@ -177,6 +187,11 @@ Native async support, automatic OpenAPI/Swagger generation, and built-in multipa
 - [ ] Prometheus metrics endpoint (`/metrics`)
 - [ ] GPU support (`CUDA_VISIBLE_DEVICES` passthrough in compose)
 - [ ] Unit tests with `pytest` + mock audio fixtures
+
+---
+
+> NOTE: BECAUSE OF TINY (MIN WHISPER MODEL) THERE IS PROBLEM WITH ACCURACY IN DETECTION LANGUAGE, THAT WHEY RECOMMENDED TO APPLY UNMIX TO SEPERATE VOCAL!
+
 
 ---
 
