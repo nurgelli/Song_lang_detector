@@ -1,0 +1,91 @@
+name: CI pipe
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: Cache flake8, pytest araçları # ← dev tool'ları ayrı cache'lenir
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-dev-tools-flake8-pytest-pytestcov
+          restore-keys: |
+            ${{ runner.os }}-dev-tools-
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install flake8 pytest pytest-cov
+
+      - name: Lint with flake8
+        run: |
+          flake8 app/ tests/ --max-line-length=100
+
+      - name: Initialize database schema
+        env:
+          PGPASSWORD: testpass
+        run: |
+          psql \
+            -h localhost \
+            -U admin \
+            -d test_db \
+            -f db/schema.sql    
+
+      - name: Run ETL
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: test_db
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_PORT: 5432
+        run: |
+          python -m app.etl.run_pipeline
+
+      - name: Run tests
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_DB: test_db
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_PORT: 5432
+        run: |
+          pytest tests/ -v --tb=short --cov=app --cov-report=term-missing
+
+      - name: Build API Docker image
+        run: |
+          docker build -f docker/Dockerfile.api -t project-api .
+
+      - name: Build Dashboard Docker image
+        run: |
+          docker build -f docker/Dockerfile.dash -t project-dash .
